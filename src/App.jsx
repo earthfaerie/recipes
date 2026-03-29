@@ -1,16 +1,18 @@
 import React, { useState } from 'react';
 import RecipeCard from './RecipeCard';
 
-const API_KEY = import.meta.env.VITE_SPOONACULAR_KEY;
-const DIETS = ['Vegetarian', 'Vegan', 'Gluten Free', 'Ketogenic', 'Paleo'];
-const INTOLERANCES = ['Dairy', 'Egg', 'Gluten', 'Peanut', 'Seafood', 'Soy', 'Tree Nut', 'Wheat'];
+const APP_ID = import.meta.env.VITE_EDAMAM_APP_ID;
+const APP_KEY = import.meta.env.VITE_EDAMAM_APP_KEY;
+const BASE = 'https://api.edamam.com/api/recipes/v2';
+const DIETS = ['Balanced', 'High-Fiber', 'High-Protein', 'Low-Carb', 'Low-Fat', 'Low-Sodium'];
+const INTOLERANCES = ['Dairy', 'Egg', 'Gluten', 'Peanut', 'Seafood', 'Soy', 'Tree-Nut', 'Wheat'];
 const MEAL_TYPES = ['Breakfast', 'Lunch', 'Dinner', 'Snack'];
 const CUISINES = ['American', 'Chinese', 'French', 'Greek', 'Indian', 'Italian', 'Japanese', 'Korean', 'Mediterranean', 'Mexican', 'Middle Eastern', 'Spanish', 'Thai'];
 
 const VIBES = [
-  { label: '🥦 eat clean',  params: { minProtein: 15, maxCalories: 600, maxSaturatedFat: 5 } },
-  { label: '😇 balanced',   params: { maxCalories: 800 } },
-  { label: '🍕 treat yourself', params: { minCalories: 500 } },
+  { label: '🥦 eat clean',     params: { diet: 'high-protein', calories: '100-600' } },
+  { label: '😇 balanced',      params: { diet: 'balanced' } },
+  { label: '🍕 treat yourself', params: { calories: '500-9999' } },
 ];
 
 export default function App() {
@@ -45,21 +47,26 @@ export default function App() {
     setError('');
     try {
       const params = new URLSearchParams({
-        apiKey: API_KEY,
-        maxReadyTime: cookTime,
-        number: 3,
-        addRecipeInformation: true,
-        excludeIngredients: 'juice,smoothie,shake,soda,coffee,tea,milk,water',
+        type: 'public',
+        app_id: APP_ID,
+        app_key: APP_KEY,
+        random: true,
+        time: `1-${cookTime}`,
+        ...(mealType && { mealType: mealType.toLowerCase() }),
+        ...(cuisine && { cuisineType: cuisine.toLowerCase() }),
         ...(diet && { diet: diet.toLowerCase() }),
-        ...(mealType && { type: mealType.toLowerCase() }),
-        ...(cuisine && { cuisine: cuisine.toLowerCase() }),
-        ...(vibe && vibe.params),
-        ...(intolerances.length && { intolerances: intolerances.map(i => i.toLowerCase()).join(',') }),
+        ...(vibe?.params?.diet && { diet: vibe.params.diet }),
+        ...(vibe?.params?.calories && { calories: vibe.params.calories }),
       });
-      const res = await fetch(`https://api.spoonacular.com/recipes/complexSearch?${params}`);
+      intolerances.forEach(i => params.append('health', i.toLowerCase()));
+      // exclude drinks
+      ['alcohol-free', 'no-oil-added'].forEach(h => params.append('health', h));
+
+      const res = await fetch(`${BASE}?${params}`);
       if (!res.ok) throw new Error();
       const data = await res.json();
-      setRecipes(data.results);
+      // Edamam returns { hits: [{ recipe: {...} }] }
+      setRecipes(data.hits.slice(0, 3).map(h => h.recipe));
       setScreen('results');
     } catch {
       setError('Something went wrong. Check your API key or connection.');
