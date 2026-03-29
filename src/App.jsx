@@ -62,7 +62,9 @@ export default function App() {
       // exclude drinks
       ['alcohol-free', 'no-oil-added'].forEach(h => params.append('health', h));
 
-      const res = await fetch(`${BASE}?${params}`);
+      const res = await fetch(`${BASE}?${params}`, {
+        headers: { 'Edamam-Account-User': APP_ID },
+      });
       if (!res.ok) throw new Error();
       const data = await res.json();
       // Edamam returns { hits: [{ recipe: {...} }] }
