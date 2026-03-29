@@ -59,16 +59,42 @@ export default function App() {
         ...(vibe?.params?.calories && { calories: vibe.params.calories }),
       });
       intolerances.forEach(i => params.append('health', i.toLowerCase()));
-      // exclude drinks
-      ['alcohol-free', 'no-oil-added'].forEach(h => params.append('health', h));
+      params.append('health', 'alcohol-free');
 
       const res = await fetch(`${BASE}?${params}`, {
         headers: { 'Edamam-Account-User': APP_ID },
       });
+      // 400 means no results for this filter combo, not a real error
+      if (res.status === 400) {
+        setRecipes([]);
+        setScreen('results');
+        return;
+      }
       if (!res.ok) throw new Error();
       const data = await res.json();
-      // Edamam returns { hits: [{ recipe: {...} }] }
-      setRecipes(data.hits.slice(0, 3).map(h => h.recipe));
+      const hits = data.hits ?? [];
+
+      const EXCLUDE_KEYWORDS = [
+        'drink', 'smoothie', 'juice', 'cocktail', 'sauce', 'dressing', 'spice mix',
+        'spice blend', 'spice rub', 'marinade', 'syrup', 'lemonade', 'tea', 'coffee',
+        'shake', 'milk', 'latte', 'frappe', 'punch', 'cider', 'brew', 'infusion',
+        'tonic', 'soda', 'vinaigrette', 'glaze', 'dry rub', 'seasoning blend',
+        'condiment', 'jam', 'jelly', 'preserve', 'pickle', 'brine', 'stock', 'broth',
+      ];
+      const EXCLUDE_DISH_TYPES = ['drinks', 'drink', 'cocktail', 'shot', 'smoothie'];
+      const filtered = hits
+        .map(h => h.recipe)
+        .filter(r => {
+          const label = r.label.toLowerCase();
+          const dishTypes = (r.dishType ?? []).map(d => d.toLowerCase());
+          const hasExcludedDishType = dishTypes.some(d => EXCLUDE_DISH_TYPES.includes(d));
+          const hasExcludedKeyword = EXCLUDE_KEYWORDS.some(k => label.includes(k));
+          const hasRecipesInTitle = label.endsWith('recipes') || label.includes(' recipes');
+          return !hasExcludedDishType && !hasExcludedKeyword && !hasRecipesInTitle;
+        })
+        .slice(0, 3);
+
+      setRecipes(filtered);
       setScreen('results');
     } catch {
       setError('Something went wrong. Check your API key or connection.');
